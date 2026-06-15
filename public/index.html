@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="StreamFlix movie streaming UI with TMDB metadata and Vidsrc embeds." />
+    <title>StreamFlix</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#/" aria-label="StreamFlix home">
+        <span>Stream</span><strong>Flix</strong>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#/">Home</a>
+        <a href="#/genre/action">Genres</a>
+        <a href="#/movies">Movies</a>
+        <a href="#/series">TV-Series</a>
+        <a href="#/top-imdb">Top IMDb</a>
+      </nav>
+      <form id="searchForm" class="search-box" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.2-4.2M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z"/></svg>
+        <input id="searchInput" type="search" placeholder="Search movies or series" autocomplete="off" />
+      </form>
+    </header>
+
+    <main>
+      <section id="homeView" class="home-view">
+        <section class="hero-grid">
+          <div class="hero-slider" id="heroSlider"></div>
+          <aside class="schedule-panel">
+            <h2>Schedule Today</h2>
+            <div id="scheduleList"></div>
+          </aside>
+        </section>
+        <p class="support-strip">Like and share our website to support us.</p>
+        <section id="sections"></section>
+      </section>
+
+      <section id="watchView" class="watch-view" hidden>
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <section class="watch-shell">
+          <div class="video-panel">
+            <iframe
+              id="playerFrame"
+              title="StreamFlix player"
+              allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
+              allowfullscreen
+              referrerpolicy="origin"
+            ></iframe>
+          </div>
+          <aside class="server-panel">
+            <div class="server-head">
+              <strong>Playing on:</strong>
+              <button id="serverName">Server 1</button>
+              <button id="openSource">Servers</button>
+              <button id="fullscreenButton">Fullscreen</button>
+            </div>
+            <button class="server-option is-active" data-server="0">Full HD</button>
+            <button class="server-option" data-server="1">Backup HD</button>
+            <button class="server-option" data-server="2">Fast Stream</button>
+          </aside>
+        </section>
+
+        <section class="movie-detail">
+          <img id="detailPoster" alt="" />
+          <div class="detail-copy">
+            <h1 id="detailTitle"></h1>
+            <p id="detailPlot"></p>
+            <div class="detail-facts" id="detailFacts"></div>
+          </div>
+          <div class="detail-actions">
+            <button id="streamButton">Stream in HD</button>
+            <button id="fullscreenAction">Fullscreen Video</button>
+            <button id="watchLaterButton">Add to Watchlist</button>
+            <button id="downloadButton">Reload Stream</button>
+          </div>
+        </section>
+
+        <section class="section-block">
+          <h2>Suggestions</h2>
+          <div class="poster-grid" id="suggestions"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>
+        <strong>StreamFlix</strong>
+        <p>Watch your favorite movies online.</p>
+      </div>
+      <p>Streams are embedded from configured third-party sources. Metadata provided by TMDB.</p>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
