@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="description" content="StreamFlix movie streaming UI with TMDB metadata and Vidsrc embeds." />
+    <meta name="theme-color" content="#050b13" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>StreamFlix</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
@@ -73,6 +77,9 @@
           </div>
           <div class="detail-actions">
             <button id="streamButton">Stream in HD</button>
+            <button id="prevButton">Previous</button>
+            <button id="nextButton">Next</button>
+            <button id="zoomButton">Zoom</button>
             <button id="fullscreenAction">Fullscreen Video</button>
             <button id="watchLaterButton">Add to Watchlist</button>
             <button id="downloadButton">Reload Stream</button>
@@ -94,6 +101,9 @@
       <p>Streams are embedded from configured third-party sources. Metadata provided by TMDB.</p>
     </footer>
 
-    <script type="module" src="/app.js"></script>
+    <!-- Load polyfills first for older browser support -->
+    <script src="/polyfills.js"></script>
+    <!-- Then load the main app -->
+    <script src="/app.js"></script>
   </body>
 </html>

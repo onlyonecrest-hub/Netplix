@@ -1,3 +1,5 @@
+/* StreamFlix - Compatible with IE11+, older browsers, and VIDAA Smart TV */
+
 :root {
   color-scheme: dark;
   --bg: #050b13;
@@ -18,7 +20,9 @@
 
 body {
   margin: 0;
+  background: #050b13;
   background: var(--bg);
+  color: #f7f9fb;
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -30,6 +34,14 @@ input {
 
 button {
   cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+button:hover,
+button:focus-visible {
+  transform: translateY(-1px);
 }
 
 .site-header {
@@ -122,7 +134,7 @@ main {
   position: relative;
   min-height: 34rem;
   overflow: hidden;
-  background: #050505;
+  background: radial-gradient(circle at top, rgba(0,168,225,0.15), transparent 45%), #02080f;
 }
 
 .hero-slide {
@@ -325,6 +337,20 @@ main {
   font-size: 0.76rem;
 }
 
+.progress-badge {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 2;
+  border-radius: 999px;
+  background: rgba(0, 168, 225, 0.95);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+  text-transform: uppercase;
+}
+
 .movie-title {
   position: absolute;
   inset: auto 0 0;
@@ -337,6 +363,18 @@ main {
 
 .watch-view {
   padding-top: 1.35rem;
+  background: radial-gradient(circle at top left, rgba(0, 168, 225, 0.09), transparent 40%), linear-gradient(180deg, rgba(3, 9, 16, 0.96), #050b13 60%);
+}
+
+.watch-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 20rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.watch-shell.is-zoomed {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
 
 .breadcrumb {
@@ -358,6 +396,22 @@ main {
 .video-panel,
 iframe {
   min-height: 38rem;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.video-panel {
+  position: relative;
+  background: #000;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+}
+
+.video-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), transparent 30%);
+  pointer-events: none;
 }
 
 .video-panel:fullscreen {
@@ -381,41 +435,49 @@ iframe {
 }
 
 .server-panel {
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(8, 18, 29, 0.98), rgba(12, 23, 38, 0.98));
   color: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
 }
 
 .server-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.9rem 1rem;
-  background: #0b1118;
+  gap: 0.75rem;
+  padding: 1rem 1rem;
+  background: rgba(5, 11, 19, 0.95);
 }
 
 .server-head button {
-  padding: 0.45rem 0.7rem;
-  font-size: 0.82rem;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
 }
 
 .server-option {
   display: block;
   width: 100%;
-  min-height: 3.2rem;
+  min-height: 3.4rem;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
-  color: #fff;
+  color: #d8e0e8;
   text-align: left;
-  padding: 0 1.2rem;
+  padding: 1rem 1.3rem;
   font-size: 1rem;
+  transition: background 180ms ease, color 180ms ease;
 }
 
 .server-option.is-active,
 .server-option:hover {
-  background: var(--prime);
-  color: #00131d;
-  font-weight: 900;
+  background: rgba(0, 168, 225, 0.15);
+  color: #fff;
+  font-weight: 700;
 }
 
 .movie-detail {
@@ -458,12 +520,23 @@ iframe {
 .detail-actions {
   display: grid;
   align-content: start;
-  gap: 0.7rem;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .detail-actions button {
-  min-height: 3rem;
+  min-height: 3.4rem;
   font-size: 1rem;
+  border-radius: 10px;
+  background: rgba(0, 168, 225, 0.15);
+  color: var(--text);
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.detail-actions button:hover {
+  background: var(--prime);
+  color: #00131d;
+  transform: translateY(-1px);
 }
 
 .footer {
@@ -487,6 +560,9 @@ iframe {
   .watch-shell,
   .movie-detail,
   .footer {
+    grid-template-columns: 1fr;
+  }
+  .watch-shell.is-zoomed {
     grid-template-columns: 1fr;
   }
 

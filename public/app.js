@@ -1,5 +1,7 @@
-const imageBase = "https://image.tmdb.org/t/p";
-const rowEndpoints = [
+// StreamFlix - ES5 compatible version for older browsers and VIDAA Smart TV
+
+var imageBase = "https://image.tmdb.org/t/p";
+var rowEndpoints = [
   ["suggestions", "Suggestions", "/trending/movie/week"],
   ["movies", "Popular Movies", "/movie/popular"],
   ["new", "New Releases", "/movie/now_playing"],
@@ -7,37 +9,99 @@ const rowEndpoints = [
   ["action", "Action", "/discover/movie?with_genres=28&sort_by=popularity.desc"],
   ["top", "Top IMDb", "/movie/top_rated"]
 ];
-const rowEndpointMap = new Map(rowEndpoints.map(([key, title, endpoint]) => [key, { title, endpoint }]));
-const storageKey = "streamflix.device.v2";
 
-const state = {
-  rows: new Map(),
-  itemCache: new Map(),
+var rowEndpointMap = createMap();
+for (var i = 0; i < rowEndpoints.length; i++) {
+  var row = rowEndpoints[i];
+  rowEndpointMap.set(row[0], { title: row[1], endpoint: row[2] });
+}
+
+var storageKey = "streamflix.device.v2";
+
+var state = {
+  rows: createMap(),
+  itemCache: createMap(),
   domains: ["vidsrcme.su", "vidsrc-embed.ru", "vidsrc-embed.su", "vsrc.su"],
   domainIndex: 0,
-  rowPages: Object.fromEntries(rowEndpoints.map(([key]) => [key, 1])),
+  rowPages: {},
   selected: null,
   heroIndex: 0,
   heroTimer: null,
   device: loadDeviceState()
 };
 
-const $ = (selector) => document.querySelector(selector);
+// Initialize row pages
+for (var j = 0; j < rowEndpoints.length; j++) {
+  state.rowPages[rowEndpoints[j][0]] = 1;
+}
+
+// Helper for Map-like behavior with fallback for very old browsers
+function createMap() {
+  if (typeof Map !== 'undefined') {
+    return new Map();
+  }
+  return {
+    _data: {},
+    set: function(key, value) {
+      this._data['_' + key] = value;
+      return this;
+    },
+    get: function(key) {
+      return this._data['_' + key];
+    },
+    has: function(key) {
+      return this._data.hasOwnProperty('_' + key);
+    },
+    entries: function() {
+      var entries = [];
+      for (var key in this._data) {
+        if (this._data.hasOwnProperty(key) && key.charAt(0) === '_') {
+          entries.push([key.substring(1), this._data[key]]);
+        }
+      }
+      return entries;
+    },
+    values: function() {
+      var values = [];
+      for (var key in this._data) {
+        if (this._data.hasOwnProperty(key) && key.charAt(0) === '_') {
+          values.push(this._data[key]);
+        }
+      }
+      return values;
+    }
+  };
+}
+
+function $(selector) {
+  return document.querySelector(selector);
+}
+
+function $$(selector) {
+  var result = document.querySelectorAll(selector);
+  var arr = [];
+  for (var i = 0; i < result.length; i++) {
+    arr.push(result[i]);
+  }
+  return arr;
+}
 
 function tmdb(path) {
-  const glue = path.includes("?") ? "&" : "?";
-  return fetchJson(`/api/tmdb${path}${glue}language=en-US`);
+  var glue = path.indexOf("?") !== -1 ? "&" : "?";
+  return fetchJson("/api/tmdb" + path + glue + "language=en-US");
 }
 
 function loadDeviceState() {
   try {
-    const existing = JSON.parse(localStorage.getItem(storageKey) || "null");
-    if (existing?.deviceId) return existing;
-  } catch {
-    // Start fresh below.
+    var existing = JSON.parse(localStorage.getItem(storageKey) || "null");
+    if (existing && existing.deviceId) {
+      return existing;
+    }
+  } catch (e) {
+    // Start fresh
   }
-  const created = {
-    deviceId: crypto.randomUUID ? crypto.randomUUID() : `device-${Date.now()}`,
+  var created = {
+    deviceId: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : "device-" + Date.now(),
     history: [],
     watchlist: []
   };
@@ -49,237 +113,457 @@ function saveDeviceState() {
   localStorage.setItem(storageKey, JSON.stringify(state.device));
 }
 
-async function fetchJson(url, timeout = 22000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    return response.json();
-  } finally {
-    clearTimeout(timer);
+function fetchJson(url, timeout) {
+  timeout = timeout || 22000;
+  
+  if (typeof fetch !== 'undefined' && typeof AbortController !== 'undefined') {
+    var controller = new AbortController();
+    var timer = setTimeout(function() { controller.abort(); }, timeout);
+    
+    return fetch(url, { signal: controller.signal })
+      .then(function(response) {
+        clearTimeout(timer);
+        if (!response.ok) {
+          throw new Error(response.status + " " + response.statusText);
+        }
+        return response.json();
+      })
+      .catch(function(error) {
+        clearTimeout(timer);
+        throw error;
+      });
+  } else {
+    // Fallback for very old browsers using XMLHttpRequest
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      var timer = setTimeout(function() {
+        xhr.abort();
+        reject(new Error("Timeout"));
+      }, timeout);
+      
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          clearTimeout(timer);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch(e) {
+              reject(e);
+            }
+          } else {
+            reject(new Error(xhr.status + " " + xhr.statusText));
+          }
+        }
+      };
+      
+      xhr.onerror = function() {
+        clearTimeout(timer);
+        reject(new Error("Network error"));
+      };
+      
+      xhr.open("GET", url, true);
+      xhr.send();
+    });
   }
 }
 
 function mediaType(item) {
-  return item.media_type || (item.first_air_date ? "tv" : "movie");
+  if (item.media_type) return item.media_type;
+  if (item.first_air_date) return "tv";
+  return "movie";
 }
 
-function normalize(item, fallbackType = "movie") {
-  const type = item.media_type || fallbackType || mediaType(item);
+function normalize(item, fallbackType) {
+  if (!fallbackType) fallbackType = "movie";
+  
+  var type = item.media_type || fallbackType || mediaType(item);
+  var releaseDate = item.release_date || item.first_air_date || "";
+  var isNew = releaseDate && releaseDate.substring(0, 4) === "2026";
+  
   return {
     id: item.id,
     mediaType: type,
     title: item.title || item.name || "Untitled",
-    year: (item.release_date || item.first_air_date || "").slice(0, 4),
+    year: releaseDate.substring(0, 4),
     posterPath: item.poster_path,
     backdropPath: item.backdrop_path || item.poster_path,
     overview: item.overview || "No description available yet.",
-    rating: item.vote_average ? item.vote_average.toFixed(1) : "N/A",
-    quality: item.release_date && item.release_date.startsWith("2026") ? "CAM" : "HD",
-    imdbID: item.imdb_id || item.external_ids?.imdb_id || ""
+    rating: item.vote_average ? String(item.vote_average).substring(0, 3) : "N/A",
+    quality: isNew ? "CAM" : "HD",
+    imdbID: item.imdb_id || (item.external_ids && item.external_ids.imdb_id) || ""
   };
 }
 
-function poster(item, size = "w342") {
-  if (!item?.posterPath) return "/poster.svg";
-  return `${imageBase}/${size}${item.posterPath}`;
+function poster(item, size) {
+  if (!size) size = "w342";
+  if (!item || !item.posterPath) return "/poster.svg";
+  return imageBase + "/" + size + item.posterPath;
 }
 
-function backdrop(item, size = "w1280") {
-  if (!item?.backdropPath) return poster(item, "w780");
-  return `${imageBase}/${size}${item.backdropPath}`;
+function backdrop(item, size) {
+  if (!size) size = "w1280";
+  if (!item || !item.backdropPath) return poster(item, "w780");
+  return imageBase + "/" + size + item.backdropPath;
 }
 
-async function refreshDomains() {
-  try {
-    const payload = await fetchJson("/api/vidsrc-domains", 7000);
-    if (payload.domains?.length) state.domains = payload.domains;
-  } catch {
-    // The bundled domains remain available.
+function refreshDomains() {
+  return fetchJson("/api/vidsrc-domains", 7000)
+    .then(function(payload) {
+      if (payload && payload.domains && payload.domains.length) {
+        state.domains = payload.domains;
+      }
+    })
+    .catch(function() {
+      // Keep bundled domains
+    });
+}
+
+function loadRows() {
+  $("#sections").innerHTML = '<p class="loading-note">Loading TMDB trending and recent titles...</p>';
+  
+  var promises = [];
+  for (var k = 0; k < rowEndpoints.length; k++) {
+    promises.push(loadRow(rowEndpoints[k][0]));
   }
+  
+  return Promise.all(promises)
+    .then(function() {
+      renderHome();
+      var first = getFirstItem();
+      if (first) state.selected = first;
+      startHero();
+    });
 }
 
-async function loadRows() {
-  $("#sections").innerHTML = `<p class="loading-note">Loading TMDB trending and recent titles...</p>`;
-  for (const [key] of rowEndpoints) {
-    await loadRow(key);
-    renderHome();
+function getFirstItem() {
+  var row = state.rows.get ? state.rows.get("suggestions") : state.rows["_suggestions"];
+  if (row && row.items && row.items.length) {
+    return row.items[0];
   }
-  const first = state.rows.get("suggestions")?.items?.[0] || [...state.itemCache.values()][0];
-  if (first) state.selected = first;
-  startHero();
+  var cached = state.itemCache.values ? state.itemCache.values() : [];
+  if (cached.length) return cached[0];
+  return null;
 }
 
-async function loadRow(key) {
-  const config = rowEndpointMap.get(key);
-  if (!config) return;
-  const page = state.rowPages[key] || 1;
-  const endpoint = withPage(config.endpoint, page);
-  try {
-    const fallbackType = endpoint.includes("/tv/") ? "tv" : "movie";
-    const payload = await tmdb(endpoint);
-    const items = (payload.results || [])
-      .filter((item) => item.poster_path && (item.media_type !== "person"))
-      .slice(0, 18)
-      .map((item) => normalize(item, fallbackType));
-    state.rows.set(key, { title: config.title, items, page, totalPages: Math.min(payload.total_pages || 1, 500) });
-    items.forEach((item) => state.itemCache.set(cacheKey(item.mediaType, item.id), item));
-  } catch {
-    state.rows.set(key, { title: config.title, items: [], page, totalPages: 1 });
-  }
+function loadRow(key) {
+  var config = rowEndpointMap.get ? rowEndpointMap.get(key) : rowEndpointMap["_" + key];
+  if (!config) return Promise.resolve();
+  
+  var page = state.rowPages[key] || 1;
+  var endpoint = withPage(config.endpoint, page);
+  var fallbackType = endpoint.indexOf("/tv/") !== -1 ? "tv" : "movie";
+  
+  return tmdb(endpoint)
+    .then(function(payload) {
+      var items = [];
+      if (payload && payload.results) {
+        for (var i = 0; i < payload.results.length && items.length < 18; i++) {
+          var item = payload.results[i];
+          if (item.poster_path && item.media_type !== "person") {
+            items.push(normalize(item, fallbackType));
+          }
+        }
+      }
+      
+      var rowMap = state.rows.set ? state.rows : state.rows._data;
+      if (state.rows.set) {
+        state.rows.set(key, { title: config.title, items: items, page: page, totalPages: Math.min(payload.total_pages || 1, 500) });
+      } else {
+        rowMap["_" + key] = { title: config.title, items: items, page: page, totalPages: Math.min(payload.total_pages || 1, 500) };
+      }
+      
+      for (var j = 0; j < items.length; j++) {
+        var cacheK = cacheKey(items[j].mediaType, items[j].id);
+        state.itemCache.set ? state.itemCache.set(cacheK, items[j]) : (state.itemCache._data["_" + cacheK] = items[j]);
+      }
+    })
+    .catch(function() {
+      if (state.rows.set) {
+        state.rows.set(key, { title: config.title, items: [], page: page, totalPages: 1 });
+      } else {
+        state.rows._data["_" + key] = { title: config.title, items: [], page: page, totalPages: 1 };
+      }
+    });
 }
 
 function withPage(endpoint, page) {
-  const glue = endpoint.includes("?") ? "&" : "?";
-  return `${endpoint}${glue}page=${page}`;
+  var glue = endpoint.indexOf("?") !== -1 ? "&" : "?";
+  return endpoint + glue + "page=" + page;
 }
 
 function cacheKey(type, id) {
-  return `${type}:${id}`;
+  return type + ":" + id;
 }
 
 function card(item) {
-  const starred = isStarred(item) ? "is-starred" : "";
-  return `
-    <button class="movie-card" data-type="${item.mediaType}" data-id="${item.id}" aria-label="Watch ${escapeHtml(item.title)}">
-      <span class="star ${starred}" data-star-type="${item.mediaType}" data-star-id="${item.id}" title="Watch later">★</span>
-      <span class="quality">${escapeHtml(item.quality)}</span>
-      <img src="${poster(item)}" alt="${escapeHtml(item.title)} poster" loading="lazy" onerror="this.src='/poster.svg'" />
-      <span class="movie-title">${escapeHtml(item.title)}</span>
-    </button>
-  `;
+  var starred = isStarred(item) ? "is-starred" : "";
+  var progress = item.progressLabel ? '<span class="progress-badge">' + escapeHtml(item.progressLabel) + '</span>' : "";
+  
+  return '<button class="movie-card" data-type="' + item.mediaType + '" data-id="' + item.id + '" aria-label="Watch ' + escapeHtml(item.title) + '">' +
+    '<span class="star ' + starred + '" data-star-type="' + item.mediaType + '" data-star-id="' + item.id + '" title="Watch later">★</span>' +
+    progress +
+    '<span class="quality">' + escapeHtml(item.quality) + '</span>' +
+    '<img src="' + poster(item) + '" alt="' + escapeHtml(item.title) + ' poster" loading="lazy" onerror="this.src=\'/poster.svg\'" />' +
+    '<span class="movie-title">' + escapeHtml(item.title) + '</span>' +
+    '</button>';
 }
 
 function renderHome() {
   $("#homeView").hidden = false;
   $("#watchView").hidden = true;
-  const heroItems = state.rows.get("suggestions")?.items || [];
+  
+  var heroRow = state.rows.get ? state.rows.get("suggestions") : state.rows["_suggestions"];
+  var heroItems = (heroRow && heroRow.items) ? heroRow.items : [];
+  
   renderHero(heroItems);
   renderSchedule(heroItems.slice(0, 6));
-  const personalRows = [
-    ["continue", "Continue Watching", historyItems()],
-    ["watchlist", "Watchlist", watchlistItems()]
-  ].filter(([, , items]) => items.length);
-
-  const personalHtml = personalRows.map(([key, title, items]) => sectionHtml(key, { title, items }, false)).join("");
-  const dynamicHtml = [...state.rows.entries()].map(([key, row]) => sectionHtml(key, row, true)).join("");
-
-  $("#sections").innerHTML = personalHtml + dynamicHtml || `<p class="loading-note">Loading TMDB titles...</p>`;
+  
+  var personalRows = [];
+  var histItems = historyItems();
+  var watchItems = watchlistItems();
+  
+  if (histItems.length > 0) {
+    personalRows.push(["continue", "Continue Watching", histItems]);
+  }
+  if (watchItems.length > 0) {
+    personalRows.push(["watchlist", "Watchlist", watchItems]);
+  }
+  
+  var personalHtml = "";
+  for (var p = 0; p < personalRows.length; p++) {
+    personalHtml += sectionHtml(personalRows[p][0], { title: personalRows[p][1], items: personalRows[p][2] }, false);
+  }
+  
+  var dynamicHtml = "";
+  var rowEntries = [];
+  if (state.rows.entries) {
+    var entriesResult = state.rows.entries();
+    if (entriesResult && typeof entriesResult[Symbol.iterator] === 'function') {
+      // Native Map iterator - convert to array
+      for (var entry of entriesResult) {
+        rowEntries.push(entry);
+      }
+    } else if (Array.isArray(entriesResult)) {
+      // Custom Map fallback
+      rowEntries = entriesResult;
+    }
+  }
+  for (var r = 0; r < rowEntries.length; r++) {
+    dynamicHtml += sectionHtml(rowEntries[r][0], rowEntries[r][1], true);
+  }
+  
+  $("#sections").innerHTML = personalHtml + dynamicHtml || '<p class="loading-note">Loading TMDB titles...</p>';
   wireCards(document);
   wirePaging();
   wireStars(document);
 }
 
 function sectionHtml(key, row, canPage) {
-    if (!row.items.length) return "";
-    return `
-      <section class="section-block" id="${key}">
-        <div class="section-head">
-          <h2 class="section-title">${escapeHtml(row.title)}</h2>
-          ${canPage ? `
-            <div class="row-pager">
-              <button data-page-row="${key}" data-page-dir="-1">Previous</button>
-              <span>Page ${row.page || 1}</span>
-              <button data-page-row="${key}" data-page-dir="1">Next</button>
-            </div>
-          ` : ""}
-        </div>
-        <div class="poster-grid">${row.items.map(card).join("")}</div>
-      </section>
-    `;
+  if (!row || !row.items || row.items.length === 0) return "";
+  
+  var pageControls = "";
+  if (canPage) {
+    var page = row.page || 1;
+    pageControls = '<div class="row-pager">' +
+      '<button data-page-row="' + key + '" data-page-dir="-1">Previous</button>' +
+      '<span>Page ' + page + '</span>' +
+      '<button data-page-row="' + key + '" data-page-dir="1">Next</button>' +
+      '</div>';
+  }
+  
+  var cardsHtml = "";
+  for (var c = 0; c < row.items.length; c++) {
+    cardsHtml += card(row.items[c]);
+  }
+  
+  return '<section class="section-block" id="' + key + '">' +
+    '<div class="section-head">' +
+    '<h2 class="section-title">' + escapeHtml(row.title) + '</h2>' +
+    pageControls +
+    '</div>' +
+    '<div class="poster-grid">' + cardsHtml + '</div>' +
+    '</section>';
 }
 
 function renderHero(items) {
-  if (!items.length) {
+  if (!items || items.length === 0) {
     $("#heroSlider").innerHTML = "";
     return;
   }
-  const active = state.heroIndex % Math.min(items.length, 5);
-  $("#heroSlider").innerHTML = items.slice(0, 5).map((item, index) => `
-    <article class="hero-slide ${index === active ? "is-active" : ""}" style="background-image:url('${backdrop(item)}')">
-      <div class="hero-caption">
-        <h1>${escapeHtml(item.title)}</h1>
-        <p>${escapeHtml(item.overview)}</p>
-        <button data-watch-type="${item.mediaType}" data-watch-id="${item.id}">Stream in HD</button>
-      </div>
-    </article>
-  `).join("");
-  document.querySelectorAll("[data-watch-id]").forEach((button) => {
-    button.addEventListener("click", () => openWatch(button.dataset.watchType, button.dataset.watchId));
-  });
+  
+  var active = state.heroIndex % Math.min(items.length, 5);
+  var slides = "";
+  
+  for (var h = 0; h < Math.min(items.length, 5); h++) {
+    var item = items[h];
+    var isActive = h === active ? "is-active" : "";
+    slides += '<article class="hero-slide ' + isActive + '" style="background-image:url(\'' + backdrop(item) + '\')">' +
+      '<div class="hero-caption">' +
+      '<h1>' + escapeHtml(item.title) + '</h1>' +
+      '<p>' + escapeHtml(item.overview) + '</p>' +
+      '<button data-watch-type="' + item.mediaType + '" data-watch-id="' + item.id + '">Stream in HD</button>' +
+      '</div>' +
+      '</article>';
+  }
+  
+  $("#heroSlider").innerHTML = slides;
+  
+  var watchButtons = $$("[data-watch-id]");
+  for (var w = 0; w < watchButtons.length; w++) {
+    watchButtons[w].onclick = (function(btn) {
+      return function() {
+        openWatch(btn.dataset.watchType, btn.dataset.watchId);
+      };
+    })(watchButtons[w]);
+  }
 }
 
 function renderSchedule(items) {
-  $("#scheduleList").innerHTML = items.map((item) => `
-    <button class="schedule-item" data-type="${item.mediaType}" data-id="${item.id}">
-      <img src="${poster(item, "w185")}" alt="" onerror="this.src='/poster.svg'" />
-      <span>${escapeHtml(item.title)}<br><small>${escapeHtml(item.year || item.mediaType)}</small></span>
-    </button>
-  `).join("");
-  document.querySelectorAll(".schedule-item").forEach((button) => {
-    button.addEventListener("click", () => openWatch(button.dataset.type, button.dataset.id));
-  });
+  var html = "";
+  for (var s = 0; s < items.length; s++) {
+    var item = items[s];
+    html += '<button class="schedule-item" data-type="' + item.mediaType + '" data-id="' + item.id + '">' +
+      '<img src="' + poster(item, "w185") + '" alt="" onerror="this.src=\'/poster.svg\'" />' +
+      '<span>' + escapeHtml(item.title) + '<br><small>' + escapeHtml(item.year || item.mediaType) + '</small></span>' +
+      '</button>';
+  }
+  
+  $("#scheduleList").innerHTML = html;
+  
+  var scheduleItems = $$(".schedule-item");
+  for (var si = 0; si < scheduleItems.length; si++) {
+    scheduleItems[si].onclick = (function(btn) {
+      return function() {
+        openWatch(btn.dataset.type, btn.dataset.id);
+      };
+    })(scheduleItems[si]);
+  }
 }
 
 function startHero() {
   clearInterval(state.heroTimer);
-  state.heroTimer = setInterval(() => {
-    const items = state.rows.get("suggestions")?.items || [];
+  state.heroTimer = setInterval(function() {
+    var suggestionsRow = state.rows.get ? state.rows.get("suggestions") : state.rows["_suggestions"];
+    var items = (suggestionsRow && suggestionsRow.items) ? suggestionsRow.items : [];
+    
     if ($("#homeView").hidden || !items.length) return;
+    
     state.heroIndex = (state.heroIndex + 1) % Math.min(items.length, 5);
     renderHero(items);
   }, 7000);
 }
 
 function wireCards(root) {
-  root.querySelectorAll(".movie-card").forEach((button) => {
-    button.addEventListener("click", () => openWatch(button.dataset.type, button.dataset.id));
-  });
+  var cards = root.querySelectorAll ? root.querySelectorAll(".movie-card") : [];
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].onclick = (function(card) {
+      return function() {
+        openWatch(card.dataset.type, card.dataset.id);
+      };
+    })(cards[i]);
+  }
 }
 
 function wireStars(root) {
-  root.querySelectorAll("[data-star-id]").forEach((star) => {
-    star.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const item = state.itemCache.get(cacheKey(star.dataset.starType, star.dataset.starId));
-      if (!item) return;
-      toggleWatchlist(item);
-      renderHome();
-    });
-  });
+  var stars = root.querySelectorAll ? root.querySelectorAll("[data-star-id]") : [];
+  for (var i = 0; i < stars.length; i++) {
+    stars[i].onclick = (function(star) {
+      return function(event) {
+        event.stopPropagation();
+        var key = cacheKey(star.dataset.starType, star.dataset.starId);
+        var item = state.itemCache.get ? state.itemCache.get(key) : state.itemCache._data["_" + key];
+        if (item) {
+          toggleWatchlist(item);
+          renderHome();
+        }
+      };
+    })(stars[i]);
+  }
 }
 
 function wirePaging() {
-  document.querySelectorAll("[data-page-row]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const key = button.dataset.pageRow;
-      const dir = Number(button.dataset.pageDir);
-      const row = state.rows.get(key);
-      const total = row?.totalPages || 500;
-      state.rowPages[key] = Math.max(1, Math.min(total, (state.rowPages[key] || 1) + dir));
-      await loadRow(key);
-      renderHome();
-      document.getElementById(key)?.scrollIntoView({ block: "start", behavior: "smooth" });
-    });
-  });
+  var pagers = $$("[data-page-row]");
+  for (var i = 0; i < pagers.length; i++) {
+    pagers[i].onclick = (function(btn) {
+      return function() {
+        var key = btn.dataset.pageRow;
+        var dir = parseInt(btn.dataset.pageDir, 10) || 0;
+        var row = state.rows.get ? state.rows.get(key) : state.rows["_" + key];
+        var total = (row && row.totalPages) ? row.totalPages : 500;
+        state.rowPages[key] = Math.max(1, Math.min(total, (state.rowPages[key] || 1) + dir));
+        
+        loadRow(key).then(function() {
+          renderHome();
+          var section = document.getElementById(key);
+          if (section && section.scrollIntoView) {
+            section.scrollIntoView(false);
+          }
+        });
+      };
+    })(pagers[i]);
+  }
 }
 
-async function getDetails(type, id) {
-  const key = cacheKey(type, id);
-  const cached = state.itemCache.get(key);
-  const endpointType = type === "tv" ? "tv" : "movie";
-  const payload = await tmdb(`/${endpointType}/${id}?append_to_response=external_ids,credits,videos`);
-  const item = {
-    ...normalize(payload, endpointType),
-    imdbID: payload.external_ids?.imdb_id || cached?.imdbID || "",
-    runtime: endpointType === "tv" ? `${payload.number_of_seasons || 1} season${payload.number_of_seasons === 1 ? "" : "s"}` : `${payload.runtime || "N/A"} min`,
-    genres: (payload.genres || []).map((genre) => genre.name).join(", "),
-    actors: (payload.credits?.cast || []).slice(0, 4).map((actor) => actor.name).join(", "),
-    director: (payload.credits?.crew || []).find((person) => person.job === "Director")?.name || payload.created_by?.[0]?.name || "N/A"
-  };
-  state.itemCache.set(key, item);
-  return item;
+function getDetails(type, id) {
+  var key = cacheKey(type, id);
+  var cached = state.itemCache.get ? state.itemCache.get(key) : state.itemCache._data["_" + key];
+  var endpointType = type === "tv" ? "tv" : "movie";
+  
+  return tmdb("/" + endpointType + "/" + id + "?append_to_response=external_ids,credits,videos")
+    .then(function(payload) {
+      var imdbID = (payload.external_ids && payload.external_ids.imdb_id) || (cached && cached.imdbID) || "";
+      var seasons = payload.number_of_seasons || 1;
+      var runtimeStr = endpointType === "tv" ? 
+        (seasons + " season" + (seasons === 1 ? "" : "s")) :
+        ((payload.runtime || "N/A") + " min");
+      
+      var genres = [];
+      if (payload.genres) {
+        for (var g = 0; g < payload.genres.length; g++) {
+          genres.push(payload.genres[g].name);
+        }
+      }
+      
+      var actors = [];
+      if (payload.credits && payload.credits.cast) {
+        for (var a = 0; a < Math.min(payload.credits.cast.length, 4); a++) {
+          actors.push(payload.credits.cast[a].name);
+        }
+      }
+      
+      var director = "N/A";
+      if (payload.credits && payload.credits.crew) {
+        for (var d = 0; d < payload.credits.crew.length; d++) {
+          if (payload.credits.crew[d].job === "Director") {
+            director = payload.credits.crew[d].name;
+            break;
+          }
+        }
+      }
+      if (director === "N/A" && payload.created_by && payload.created_by.length) {
+        director = payload.created_by[0].name;
+      }
+      
+      var item = {
+        id: payload.id,
+        mediaType: endpointType,
+        title: payload.title || payload.name || "Untitled",
+        year: (payload.release_date || payload.first_air_date || "").substring(0, 4),
+        posterPath: payload.poster_path,
+        backdropPath: payload.backdrop_path || payload.poster_path,
+        overview: payload.overview || "No description available yet.",
+        rating: payload.vote_average ? String(payload.vote_average).substring(0, 3) : "N/A",
+        quality: (payload.release_date || payload.first_air_date || "").substring(0, 4) === "2026" ? "CAM" : "HD",
+        imdbID: imdbID,
+        runtime: runtimeStr,
+        genres: genres.join(", "),
+        actors: actors.join(", "),
+        director: director
+      };
+      
+      state.itemCache.set ? state.itemCache.set(key, item) : (state.itemCache._data["_" + key] = item);
+      return item;
+    });
 }
 
 function activeDomain() {
@@ -287,151 +571,347 @@ function activeDomain() {
 }
 
 function embedUrl(item) {
-  const params = new URLSearchParams({ autoplay: "1", ds_lang: "en", autonext: "1" });
+  var params = "autoplay=1&ds_lang=en&autonext=1";
   if (item.imdbID) {
-    if (item.mediaType === "tv") return `https://${activeDomain()}/embed/tv/${item.imdbID}/1-1?${params}`;
-    return `https://${activeDomain()}/embed/movie/${item.imdbID}?${params}`;
+    if (item.mediaType === "tv") return "https://" + activeDomain() + "/embed/tv/" + item.imdbID + "/1-1?" + params;
+    return "https://" + activeDomain() + "/embed/movie/" + item.imdbID + "?" + params;
   }
-  if (item.mediaType === "tv") return `https://${activeDomain()}/embed/tv/${item.id}/1-1?${params}`;
-  return `https://${activeDomain()}/embed/movie/${item.id}?${params}`;
+  if (item.mediaType === "tv") return "https://" + activeDomain() + "/embed/tv/" + item.id + "/1-1?" + params;
+  return "https://" + activeDomain() + "/embed/movie/" + item.id + "?" + params;
 }
 
-async function openWatch(type, id) {
-  const item = await getDetails(type, id);
-  state.selected = item;
-  const source = embedUrl(item);
-  rememberWatching(item);
-
-  $("#homeView").hidden = true;
-  $("#watchView").hidden = false;
-  $("#breadcrumb").innerHTML = `<a href="#/">Home</a> / ${item.mediaType === "tv" ? "TV-Series" : "Movies"} / ${escapeHtml(item.title)}`;
-  $("#playerFrame").src = source;
-  $("#serverName").textContent = `Server ${state.domainIndex + 1}`;
-  renderServerOptions();
-  $("#detailPoster").src = poster(item);
-  $("#detailPoster").alt = `${item.title} poster`;
-  $("#detailTitle").textContent = item.title;
-  $("#detailPlot").textContent = item.overview;
-  $("#detailFacts").innerHTML = `
-    <span><strong>Genre:</strong> ${escapeHtml(item.genres || item.genre || "N/A")}</span>
-    <span><strong>Quality:</strong> <mark>${escapeHtml(item.quality || "HD")}</mark></span>
-    <span><strong>Actor:</strong> ${escapeHtml(item.actors || "N/A")}</span>
-    <span><strong>Duration:</strong> ${escapeHtml(item.runtime || "N/A")}</span>
-    <span><strong>Director:</strong> ${escapeHtml(item.director || "N/A")}</span>
-    <span><strong>Release:</strong> ${escapeHtml(item.year || "N/A")}</span>
-    <span><strong>IMDb:</strong> ${escapeHtml(item.rating || "N/A")}</span>
-    <span><strong>TMDB:</strong> ${escapeHtml(item.id)}</span>
-  `;
-  await renderSuggestions(type, id);
-  updateWatchLaterButton();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function openWatch(type, id) {
+  return getDetails(type, id)
+    .then(function(item) {
+      state.selected = item;
+      var source = embedUrl(item);
+      rememberWatching(item);
+      
+      $("#homeView").hidden = true;
+      $("#watchView").hidden = false;
+      
+      var breadcrumbType = item.mediaType === "tv" ? "TV-Series" : "Movies";
+      $("#breadcrumb").innerHTML = '<a href="#/">Home</a> / ' + breadcrumbType + ' / ' + escapeHtml(item.title);
+      $("#playerFrame").src = source;
+      $("#serverName").textContent = "Server " + (state.domainIndex + 1);
+      renderServerOptions();
+      $("#detailPoster").src = poster(item);
+      $("#detailPoster").alt = item.title + " poster";
+      $("#detailTitle").textContent = item.title;
+      $("#detailPlot").textContent = item.overview;
+      
+      var detailHtml = '<span><strong>Genre:</strong> ' + escapeHtml(item.genres || "N/A") + '</span>' +
+        '<span><strong>Quality:</strong> <mark>' + escapeHtml(item.quality || "HD") + '</mark></span>' +
+        '<span><strong>Actor:</strong> ' + escapeHtml(item.actors || "N/A") + '</span>' +
+        '<span><strong>Duration:</strong> ' + escapeHtml(item.runtime || "N/A") + '</span>' +
+        '<span><strong>Director:</strong> ' + escapeHtml(item.director || "N/A") + '</span>' +
+        '<span><strong>Release:</strong> ' + escapeHtml(item.year || "N/A") + '</span>' +
+        '<span><strong>IMDb:</strong> ' + escapeHtml(item.rating || "N/A") + '</span>' +
+        '<span><strong>TMDB:</strong> ' + escapeHtml(item.id) + '</span>';
+      
+      $("#detailFacts").innerHTML = detailHtml;
+      
+      return renderSuggestions(type, id);
+    })
+    .then(function() {
+      updateWatchLaterButton();
+      if (window.scrollTo) {
+        window.scrollTo(0, 0);
+      }
+    });
 }
 
-async function renderSuggestions(type, id) {
-  let items = [];
-  try {
-    const endpointType = type === "tv" ? "tv" : "movie";
-    const payload = await tmdb(`/${endpointType}/${id}/recommendations?page=1`);
-    items = (payload.results || [])
-      .filter((item) => item.poster_path)
-      .slice(0, 12)
-      .map((item) => normalize(item, endpointType));
-    items.forEach((item) => state.itemCache.set(cacheKey(item.mediaType, item.id), item));
-  } catch {
-    items = [];
-  }
-  if (!items.length) {
-    items = [...state.itemCache.values()]
-      .filter((item) => !(item.mediaType === type && String(item.id) === String(id)))
-      .slice(0, 12);
-  }
-  $("#suggestions").innerHTML = items.map(card).join("");
-  wireCards($("#suggestions"));
-  wireStars($("#suggestions"));
+function renderSuggestions(type, id) {
+  var endpointType = type === "tv" ? "tv" : "movie";
+  
+  return tmdb("/" + endpointType + "/" + id + "/recommendations?page=1")
+    .then(function(payload) {
+      var items = [];
+      if (payload && payload.results) {
+        for (var i = 0; i < payload.results.length && items.length < 12; i++) {
+          var item = payload.results[i];
+          if (item.poster_path) {
+            items.push(normalize(item, endpointType));
+          }
+        }
+      }
+      
+      for (var j = 0; j < items.length; j++) {
+        var cacheK = cacheKey(items[j].mediaType, items[j].id);
+        state.itemCache.set ? state.itemCache.set(cacheK, items[j]) : (state.itemCache._data["_" + cacheK] = items[j]);
+      }
+      
+      if (items.length === 0) {
+        var cached = state.itemCache.values ? state.itemCache.values() : [];
+        for (var k = 0; k < cached.length && items.length < 12; k++) {
+          if (!(cached[k].mediaType === type && String(cached[k].id) === String(id))) {
+            items.push(cached[k]);
+          }
+        }
+      }
+      
+      var cardsHtml = "";
+      for (var c = 0; c < items.length; c++) {
+        cardsHtml += card(items[c]);
+      }
+      
+      $("#suggestions").innerHTML = cardsHtml;
+      wireCards($("#suggestions"));
+      wireStars($("#suggestions"));
+    })
+    .catch(function() {
+      $("#suggestions").innerHTML = "";
+    });
 }
 
-async function search(query) {
-  $("#sections").innerHTML = `<p class="loading-note">Searching TMDB for "${escapeHtml(query)}"...</p>`;
-  try {
-    const payload = await tmdb(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false`);
-    const items = (payload.results || [])
-      .filter((item) => item.media_type === "movie" || item.media_type === "tv")
-      .filter((item) => item.poster_path)
-      .slice(0, 18)
-      .map((item) => normalize(item, item.media_type));
-    items.forEach((item) => state.itemCache.set(cacheKey(item.mediaType, item.id), item));
-    state.rows.set("suggestions", { title: `Search: ${query}`, items });
-    renderHome();
-  } catch (error) {
-    $("#sections").innerHTML = `<p class="loading-note">${escapeHtml(error.message)}</p>`;
-  }
+function search(query) {
+  $("#sections").innerHTML = '<p class="loading-note">Searching TMDB for "' + escapeHtml(query) + '"...</p>';
+  
+  return tmdb("/search/multi?query=" + encodeURIComponent(query) + "&include_adult=false")
+    .then(function(payload) {
+      var items = [];
+      if (payload && payload.results) {
+        for (var i = 0; i < payload.results.length && items.length < 18; i++) {
+          var result = payload.results[i];
+          if ((result.media_type === "movie" || result.media_type === "tv") && result.poster_path) {
+            items.push(normalize(result, result.media_type));
+          }
+        }
+      }
+      
+      for (var j = 0; j < items.length; j++) {
+        var cacheK = cacheKey(items[j].mediaType, items[j].id);
+        state.itemCache.set ? state.itemCache.set(cacheK, items[j]) : (state.itemCache._data["_" + cacheK] = items[j]);
+      }
+      
+      if (state.rows.set) {
+        state.rows.set("suggestions", { title: "Search: " + query, items: items });
+      } else {
+        state.rows._data["_suggestions"] = { title: "Search: " + query, items: items };
+      }
+      
+      renderHome();
+    })
+    .catch(function(error) {
+      $("#sections").innerHTML = '<p class="loading-note">' + escapeHtml(error.message) + '</p>';
+    });
 }
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  })[char]);
+  var str = String(value || "");
+  var div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function wireGlobal() {
-  $("#searchForm").addEventListener("submit", (event) => {
+  $("#searchForm").onsubmit = function(event) {
     event.preventDefault();
-    const query = $("#searchInput").value.trim();
+    var query = $("#searchInput").value.trim();
     if (query) search(query);
-  });
-  $("#streamButton").addEventListener("click", () => state.selected && openWatch(state.selected.mediaType, state.selected.id));
-  $("#fullscreenButton").addEventListener("click", toggleFullscreen);
-  $("#fullscreenAction").addEventListener("click", toggleFullscreen);
-  $("#watchLaterButton").addEventListener("click", () => {
+  };
+  
+  $("#streamButton").onclick = function() {
+    if (state.selected) openWatch(state.selected.mediaType, state.selected.id);
+  };
+  
+  $("#prevButton").onclick = function() { navigateWatch(-1); };
+  $("#nextButton").onclick = function() { navigateWatch(1); };
+  $("#zoomButton").onclick = toggleZoom;
+  $("#fullscreenButton").onclick = toggleFullscreen;
+  $("#fullscreenAction").onclick = toggleFullscreen;
+  
+  $("#watchLaterButton").onclick = function() {
     if (!state.selected) return;
     toggleWatchlist(state.selected);
     updateWatchLaterButton();
     renderSuggestions(state.selected.mediaType, state.selected.id);
-  });
-  $("#downloadButton").addEventListener("click", () => state.selected && openWatch(state.selected.mediaType, state.selected.id));
-  $("#openSource").addEventListener("click", () => document.querySelector(".server-panel")?.classList.toggle("is-open"));
-  document.querySelectorAll(".server-option").forEach((button, index) => {
-    button.addEventListener("click", () => {
-      state.domainIndex = index % state.domains.length;
-      document.querySelectorAll(".server-option").forEach((option) => option.classList.remove("is-active"));
-      button.classList.add("is-active");
-      if (state.selected) openWatch(state.selected.mediaType, state.selected.id);
-    });
-  });
-  window.addEventListener("hashchange", () => {
+  };
+  
+  $("#downloadButton").onclick = function() {
+    if (state.selected) openWatch(state.selected.mediaType, state.selected.id);
+  };
+  
+  $("#openSource").onclick = function() {
+    var panel = document.querySelector(".server-panel");
+    if (panel) {
+      if (panel.classList && panel.classList.toggle) {
+        panel.classList.toggle("is-open");
+      } else {
+        var classes = (panel.className || "").split(" ");
+        var idx = classes.indexOf("is-open");
+        if (idx !== -1) {
+          classes.splice(idx, 1);
+        } else {
+          classes.push("is-open");
+        }
+        panel.className = classes.join(" ");
+      }
+    }
+  };
+  
+  var serverOptions = $$(".server-option");
+  for (var i = 0; i < serverOptions.length; i++) {
+    serverOptions[i].onclick = (function(btn, index) {
+      return function() {
+        state.domainIndex = index % state.domains.length;
+        var allOptions = $$(".server-option");
+        for (var j = 0; j < allOptions.length; j++) {
+          if (allOptions[j].classList) {
+            allOptions[j].classList.remove("is-active");
+          }
+        }
+        if (btn.classList) {
+          btn.classList.add("is-active");
+        }
+        renderServerOptions();
+        if (state.selected) {
+          var source = embedUrl(state.selected);
+          $("#playerFrame").src = source;
+        }
+      };
+    })(serverOptions[i], i);
+  }
+  
+  window.onhashchange = function() {
     if (location.hash === "#/" || location.hash === "") renderHome();
-  });
-  document.addEventListener("fullscreenchange", () => {
-    const label = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
-    $("#fullscreenButton").textContent = label;
-    $("#fullscreenAction").textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen Video";
-  });
+  };
+  
+  document.onFullscreenChange = function() {
+    var label = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+    if ($("#fullscreenButton")) $("#fullscreenButton").textContent = label;
+    if ($("#fullscreenAction")) {
+      $("#fullscreenAction").textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen Video";
+    }
+  };
+  
+  window.onbeforeunload = saveDeviceState;
 }
 
-async function toggleFullscreen() {
-  const target = document.querySelector(".video-panel");
+function toggleFullscreen() {
+  var target = document.querySelector(".video-panel");
   if (!target) return;
+  
   try {
     if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      await target.requestFullscreen({ navigationUI: "hide" });
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else if (target.requestFullscreen) {
+      target.requestFullscreen();
     }
-  } catch {
-    const iframe = $("#playerFrame");
-    iframe?.requestFullscreen?.();
+  } catch (e) {
+    var iframe = $("#playerFrame");
+    if (iframe && iframe.requestFullscreen) {
+      try {
+        iframe.requestFullscreen();
+      } catch (ee) {}
+    }
   }
 }
 
+function getNavigationItems() {
+  var suggestionsRow = state.rows.get ? state.rows.get("suggestions") : state.rows["_suggestions"];
+  var suggestions = (suggestionsRow && suggestionsRow.items) ? suggestionsRow.items : [];
+  
+  if (suggestions.length > 1) {
+    return suggestions;
+  }
+  
+  var cached = [];
+  if (state.itemCache.values) {
+    var valuesResult = state.itemCache.values();
+    if (valuesResult && typeof valuesResult[Symbol.iterator] === 'function') {
+      // Native Map iterator - convert to array
+      for (var item of valuesResult) {
+        cached.push(item);
+      }
+    } else if (Array.isArray(valuesResult)) {
+      // Custom Map fallback
+      cached = valuesResult;
+    }
+  }
+  
+  var filtered = [];
+  for (var i = 0; i < cached.length; i++) {
+    if (cached[i] && cached[i].mediaType === state.selected.mediaType) {
+      filtered.push(cached[i]);
+    }
+  }
+  return filtered;
+}
+
+function getCurrentWatchIndex(items) {
+  if (!state.selected) return -1;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].mediaType === state.selected.mediaType && String(items[i].id) === String(state.selected.id)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function navigateWatch(direction) {
+  var items = getNavigationItems();
+  if (!items.length || !state.selected) return;
+  
+  var currentIndex = getCurrentWatchIndex(items);
+  var nextIndex = ((currentIndex + direction + items.length) % items.length + items.length) % items.length;
+  var nextItem = items[nextIndex];
+  
+  if (nextItem) {
+    openWatch(nextItem.mediaType, nextItem.id);
+  }
+}
+
+function toggleZoom() {
+  var shell = document.querySelector(".watch-shell");
+  if (!shell) return;
+  
+  var hasZoom = shell.className && shell.className.indexOf("is-zoomed") !== -1;
+  if (hasZoom) {
+    if (shell.classList) {
+      shell.classList.remove("is-zoomed");
+    } else {
+      shell.className = (shell.className || "").replace(/\bis-zoomed\b/g, "").trim();
+    }
+  } else {
+    if (shell.classList) {
+      shell.classList.add("is-zoomed");
+    } else {
+      shell.className = (shell.className || "") + " is-zoomed";
+    }
+  }
+  
+  var button = $("#zoomButton");
+  var isZoomed = shell.className && shell.className.indexOf("is-zoomed") !== -1;
+  button.textContent = isZoomed ? "Normal View" : "Zoom";
+}
+
 function renderServerOptions() {
-  document.querySelectorAll(".server-option").forEach((button, index) => {
-    button.textContent = `${index === 0 ? "Full HD" : index === 1 ? "Backup HD" : "Fast Stream"} - ${state.domains[index % state.domains.length] || "source"}`;
-    button.classList.toggle("is-active", index === state.domainIndex);
-  });
+  var serverOptions = $$(".server-option");
+  for (var i = 0; i < serverOptions.length; i++) {
+    var btn = serverOptions[i];
+    var serverName = state.domains[i % state.domains.length] || "source";
+    var label = (i === 0 ? "Full HD" : (i === 1 ? "Backup HD" : "Fast Stream")) + " - " + serverName;
+    btn.textContent = label;
+    
+    var isActive = i === state.domainIndex;
+    if (btn.classList) {
+      if (isActive) btn.classList.add("is-active");
+      else btn.classList.remove("is-active");
+    } else {
+      var classes = (btn.className || "").split(" ");
+      var idx = classes.indexOf("is-active");
+      if (isActive && idx === -1) {
+        classes.push("is-active");
+      } else if (!isActive && idx !== -1) {
+        classes.splice(idx, 1);
+      }
+      btn.className = classes.join(" ");
+    }
+  }
+  
+  var active = state.domains[state.domainIndex % state.domains.length] || "source";
+  $("#serverName").textContent = "Server " + (state.domainIndex + 1) + " · " + active;
 }
 
 function serializeItem(item) {
@@ -450,51 +930,103 @@ function serializeItem(item) {
 }
 
 function rememberWatching(item) {
-  const key = cacheKey(item.mediaType, item.id);
-  state.device.history = [
-    { key, item: serializeItem(item), lastWatchedAt: Date.now(), status: "Started" },
-    ...state.device.history.filter((entry) => entry.key !== key)
-  ].slice(0, 30);
+  var key = cacheKey(item.mediaType, item.id);
+  var serialized = serializeItem(item);
+  
+  state.device.history = [{
+    key: key,
+    item: serialized,
+    lastWatchedAt: Date.now(),
+    status: "Started"
+  }].concat(
+    state.device.history.filter(function(entry) { return entry.key !== key; })
+  ).slice(0, 30);
+  
   saveDeviceState();
 }
 
 function historyItems() {
-  return state.device.history.map((entry) => {
-    state.itemCache.set(cacheKey(entry.item.mediaType, entry.item.id), entry.item);
-    return { ...entry.item, progressLabel: entry.status || "Continue" };
-  });
+  var items = [];
+  for (var i = 0; i < state.device.history.length; i++) {
+    var entry = state.device.history[i];
+    var key = cacheKey(entry.item.mediaType, entry.item.id);
+    state.itemCache.set ? state.itemCache.set(key, entry.item) : (state.itemCache._data["_" + key] = entry.item);
+    
+    items.push({
+      id: entry.item.id,
+      mediaType: entry.item.mediaType,
+      title: entry.item.title,
+      year: entry.item.year,
+      posterPath: entry.item.posterPath,
+      backdropPath: entry.item.backdropPath,
+      overview: entry.item.overview,
+      rating: entry.item.rating,
+      quality: entry.item.quality,
+      imdbID: entry.item.imdbID,
+      progressLabel: entry.status || "Continue"
+    });
+  }
+  return items;
 }
 
 function watchlistItems() {
-  return state.device.watchlist.map((entry) => {
-    state.itemCache.set(cacheKey(entry.mediaType, entry.id), entry);
-    return entry;
-  });
+  var items = [];
+  for (var i = 0; i < state.device.watchlist.length; i++) {
+    var entry = state.device.watchlist[i];
+    var key = cacheKey(entry.mediaType, entry.id);
+    state.itemCache.set ? state.itemCache.set(key, entry) : (state.itemCache._data["_" + key] = entry);
+    items.push(entry);
+  }
+  return items;
 }
 
 function isStarred(item) {
-  return state.device.watchlist.some((entry) => entry.mediaType === item.mediaType && String(entry.id) === String(item.id));
+  for (var i = 0; i < state.device.watchlist.length; i++) {
+    var entry = state.device.watchlist[i];
+    if (entry.mediaType === item.mediaType && String(entry.id) === String(item.id)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function toggleWatchlist(item) {
-  const exists = isStarred(item);
+  var exists = isStarred(item);
   if (exists) {
-    state.device.watchlist = state.device.watchlist.filter((entry) => !(entry.mediaType === item.mediaType && String(entry.id) === String(item.id)));
+    var filtered = [];
+    for (var i = 0; i < state.device.watchlist.length; i++) {
+      var entry = state.device.watchlist[i];
+      if (!(entry.mediaType === item.mediaType && String(entry.id) === String(item.id))) {
+        filtered.push(entry);
+      }
+    }
+    state.device.watchlist = filtered;
   } else {
-    state.device.watchlist = [serializeItem(item), ...state.device.watchlist].slice(0, 50);
+    state.device.watchlist = [serializeItem(item)].concat(state.device.watchlist).slice(0, 50);
   }
   saveDeviceState();
 }
 
 function updateWatchLaterButton() {
   if (!state.selected) return;
-  $("#watchLaterButton").textContent = isStarred(state.selected) ? "Remove from Watchlist" : "Add to Watchlist";
+  var btn = $("#watchLaterButton");
+  btn.textContent = isStarred(state.selected) ? "Remove from Watchlist" : "Add to Watchlist";
 }
 
-async function init() {
+function init() {
   wireGlobal();
-  await refreshDomains();
-  await loadRows();
+  return refreshDomains()
+    .then(function() {
+      return loadRows();
+    })
+    .catch(function(error) {
+      console.log("Init error:", error);
+    });
 }
 
-init();
+// Start the app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

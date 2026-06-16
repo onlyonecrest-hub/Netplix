@@ -10,10 +10,7 @@ loadLocalEnv(join(__dirname, ".env"));
 const port = Number(process.env.PORT || 3000);
 
 const FALLBACK_DOMAINS = [
-  "vidsrc-embed.ru",
-  "vidsrc-embed.su",
-  "vidsrcme.su",
-  "vsrc.su"
+  "vidsrc.cc"
 ];
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -41,6 +38,24 @@ function loadLocalEnv(filePath) {
     const value = trimmed.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
     if (key && process.env[key] === undefined) process.env[key] = value;
   }
+}
+
+function parseEnvKeys(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map((entry) => String(entry).trim()).filter(Boolean);
+  } catch {
+    // Ignore invalid JSON, fall back to comma-separated parsing.
+  }
+  return value.split(",").map((entry) => entry.trim()).filter(Boolean);
+}
+
+function getTmdbAuth() {
+  const token = process.env.TMDB_READ_ACCESS_TOKEN;
+  const apiKeys = parseEnvKeys(process.env.TMDB_API_KEYS || "");
+  const apiKey = apiKeys.length ? apiKeys[Math.floor(Math.random() * apiKeys.length)] : process.env.TMDB_API_KEY;
+  return { token, apiKey };
 }
 
 let cachedDomains = null;
@@ -90,9 +105,7 @@ async function getVidsrcDomains(force = false) {
     if (!response.ok) throw new Error(`Vidsrc domain page returned ${response.status}`);
     const html = await response.text();
     const parsed = parseDomains(html);
-    const preferred = parsed.filter((domain) => FALLBACK_DOMAINS.includes(domain));
-    const domains = preferred.length ? preferred : parsed;
-    cachedDomains = domains.length ? domains : FALLBACK_DOMAINS;
+    cachedDomains = parsed.length ? parsed : FALLBACK_DOMAINS;
     cachedAt = Date.now();
     return cachedDomains;
   } catch (error) {
@@ -204,13 +217,15 @@ async function handleTmdb(req, res) {
 
   const tmdbUrl = new URL(`https://api.themoviedb.org/3/${path}`);
   incoming.searchParams.forEach((value, key) => tmdbUrl.searchParams.set(key, value));
-  const token = process.env.TMDB_READ_ACCESS_TOKEN;
-  const apiKey = process.env.TMDB_API_KEY;
-  if (!token && apiKey) {
-    tmdbUrl.searchParams.set("api_key", apiKey);
-  } else if (!token && !apiKey) {
-    sendJson(res, 200, { error: "Set TMDB_READ_ACCESS_TOKEN or TMDB_API_KEY on the host." });
+  const { token, apiKey } = getTmdbAuth();
+
+  if (!token && !apiKey) {
+    sendJson(res, 200, { error: "Set TMDB_READ_ACCESS_TOKEN, TMDB_API_KEY, or TMDB_API_KEYS on the host." });
     return;
+  }
+
+  if (!token) {
+    tmdbUrl.searchParams.set("api_key", apiKey);
   }
 
   try {
