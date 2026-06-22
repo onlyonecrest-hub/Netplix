@@ -189,6 +189,7 @@ function renderRoute(key, title) {
   wireCards(document);
   wirePaging();
   wireStars(document);
+  return Promise.resolve();
 }
 
 function handleRoute() {
@@ -196,9 +197,7 @@ function handleRoute() {
   state.currentRoute = config.key;
   updateActiveNav(location.hash || "#/" );
   if (config.showHero) {
-    return loadRows().then(function() {
-      renderHome();
-    });
+    return loadRows();
   }
   if (config.key === "genres") {
     return renderGenrePage(config.key, config.title);
@@ -512,9 +511,12 @@ function renderHome() {
   if (state.rows.entries) {
     var entriesResult = state.rows.entries();
     if (entriesResult && typeof entriesResult[Symbol.iterator] === 'function') {
-      // Native Map iterator - convert to array
-      for (var entry of entriesResult) {
-        rowEntries.push(entry);
+      // Native Map iterator - convert to array (ES5 compatible)
+      var iter = entriesResult[Symbol.iterator]();
+      var iterResult = iter.next();
+      while (!iterResult.done) {
+        rowEntries.push(iterResult.value);
+        iterResult = iter.next();
       }
     } else if (Array.isArray(entriesResult)) {
       // Custom Map fallback
@@ -1006,9 +1008,12 @@ function getNavigationItems() {
   if (state.itemCache.values) {
     var valuesResult = state.itemCache.values();
     if (valuesResult && typeof valuesResult[Symbol.iterator] === 'function') {
-      // Native Map iterator - convert to array
-      for (var item of valuesResult) {
-        cached.push(item);
+      // Native Map iterator - convert to array (ES5 compatible)
+      var iter = valuesResult[Symbol.iterator]();
+      var iterResult = iter.next();
+      while (!iterResult.done) {
+        cached.push(iterResult.value);
+        iterResult = iter.next();
       }
     } else if (Array.isArray(valuesResult)) {
       // Custom Map fallback
