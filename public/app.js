@@ -30,17 +30,37 @@ for (var i = 0; i < genreEndpoints.length; i++) {
   genreEndpointMap.set(genre[0], { title: genre[1], endpoint: genre[2] });
 }
 
+var providerList = [
+  { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8 },
+  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 119 },
+  { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2 },
+  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337 },
+  { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15 },
+  { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350 },
+  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 384 }
+];
+
 var storageKey = "streamflix.device.v2";
 
 var state = {
   rows: createMap(),
   itemCache: createMap(),
-  domains: ["vidsrcme.su", "vidsrc-embed.ru", "vidsrc-embed.su", "vsrc.su"],
+  domains: [
+    "vidsrcme.ru",
+    "vidsrcme.su",
+    "vidsrc-me.ru",
+    "vidsrc-me.su",
+    "vidsrc-embed.ru",
+    "vidsrc-embed.su",
+    "vsrc.su"
+  ],
   domainIndex: 0,
   rowPages: {},
   selected: null,
   heroIndex: 0,
   heroTimer: null,
+  selectedProvider: providerList[0].id,
+  providerType: "movie",
   device: loadDeviceState()
 };
 
@@ -502,6 +522,7 @@ function renderHome() {
   
   renderHero(heroItems);
   renderSchedule(heroItems.slice(0, 6));
+  renderProviderPanel();
   
   var personalRows = [];
   var histItems = historyItems();
@@ -544,6 +565,96 @@ function renderHome() {
   wireCards(document);
   wirePaging();
   wireStars(document);
+}
+
+function renderProviderPanel() {
+  var buttonHtml = [];
+  for (var i = 0; i < providerList.length; i++) {
+    var provider = providerList[i];
+    var activeClass = provider.id === state.selectedProvider ? " provider-active" : "";
+    buttonHtml.push('<button type="button" class="provider-button' + activeClass + '" data-provider="' + provider.id + '" style="background:' + provider.color + ';">' + escapeHtml(provider.title) + '</button>');
+  }
+
+  var section = $('#providerSection');
+  var providerPanel = $('.provider-grid');
+  if (providerPanel) {
+    providerPanel.innerHTML = buttonHtml.join('');
+  }
+
+  var providerButtons = document.querySelectorAll('.provider-button');
+  var providerTypeButtons = document.querySelectorAll('.provider-type');
+  for (var j = 0; j < providerTypeButtons.length; j++) {
+    providerTypeButtons[j].className = 'provider-type' + (providerTypeButtons[j].dataset.type === state.providerType ? ' is-active' : '');
+    providerTypeButtons[j].onclick = (function(btn) {
+      return function() {
+        state.providerType = btn.dataset.type || 'movie';
+        for (var k = 0; k < providerTypeButtons.length; k++) {
+          providerTypeButtons[k].className = 'provider-type' + (providerTypeButtons[k].dataset.type === state.providerType ? ' is-active' : '');
+        }
+        loadProviderRow();
+      };
+    })(providerTypeButtons[j]);
+  }
+
+  for (var k = 0; k < providerButtons.length; k++) {
+    providerButtons[k].onclick = (function(btn) {
+      return function() {
+        state.selectedProvider = btn.dataset.provider || state.selectedProvider;
+        renderProviderPanel();
+      };
+    })(providerButtons[k]);
+  }
+
+  if (section) {
+    section.innerHTML = '<p class="loading-note">Loading provider titles...</p>';
+  }
+
+  loadProviderRow();
+}
+
+function loadProviderRow() {
+  var provider = null;
+  for (var i = 0; i < providerList.length; i++) {
+    if (providerList[i].id === state.selectedProvider) {
+      provider = providerList[i];
+      break;
+    }
+  }
+  if (!provider) return Promise.resolve();
+
+  var endpoint = state.providerType === 'tv' ? '/discover/tv' : '/discover/movie';
+  endpoint += '?with_watch_providers=' + provider.tmdbId + '&watch_region=US&sort_by=popularity.desc&page=1';
+
+  return tmdb(endpoint)
+    .then(function(payload) {
+      var items = [];
+      if (payload && payload.results) {
+        for (var i = 0; i < payload.results.length && items.length < 18; i++) {
+          var item = payload.results[i];
+          if (item.poster_path && item.media_type !== 'person') {
+            items.push(normalize(item, state.providerType));
+          }
+        }
+      }
+
+      var section = document.getElementById('providerSection');
+      if (!section) return;
+      if (!items.length) {
+        section.innerHTML = '<p class="loading-note">No provider titles found.</p>';
+        return;
+      }
+      var cardsHtml = '';
+      for (var j = 0; j < items.length; j++) {
+        cardsHtml += card(items[j]);
+      }
+      section.innerHTML = '<div class="section-block"><div class="section-head"><h3 class="section-title">Top ' + escapeHtml(provider.title) + ' ' + (state.providerType === 'tv' ? 'TV Shows' : 'Movies') + '</h3></div><div class="poster-grid">' + cardsHtml + '</div></div>';
+      wireCards(section);
+      wireStars(section);
+    })
+    .catch(function() {
+      var section = document.getElementById('providerSection');
+      if (section) section.innerHTML = '<p class="loading-note">Unable to load provider titles.</p>';
+    });
 }
 
 function sectionHtml(key, row, canPage) {
@@ -964,28 +1075,6 @@ function wireGlobal() {
     }
   };
   
-  var serverOptions = $$(".server-option");
-  for (var i = 0; i < serverOptions.length; i++) {
-    serverOptions[i].onclick = (function(btn, index) {
-      return function() {
-        state.domainIndex = index % state.domains.length;
-        var allOptions = $$(".server-option");
-        for (var j = 0; j < allOptions.length; j++) {
-          if (allOptions[j].classList) {
-            allOptions[j].classList.remove("is-active");
-          }
-        }
-        if (btn.classList) {
-          btn.classList.add("is-active");
-        }
-        renderServerOptions();
-        if (state.selected) {
-          var source = embedUrl(state.selected);
-          $("#playerFrame").src = source;
-        }
-      };
-    })(serverOptions[i], i);
-  }
   
   window.onhashchange = function() {
     handleRoute();
@@ -1104,31 +1193,34 @@ function toggleZoom() {
 }
 
 function renderServerOptions() {
-  var serverOptions = $$(".server-option");
-  for (var i = 0; i < serverOptions.length; i++) {
-    var btn = serverOptions[i];
-    var serverName = state.domains[i % state.domains.length] || "source";
-    var label = (i === 0 ? "Full HD" : (i === 1 ? "Backup HD" : "Fast Stream")) + " - " + serverName;
-    btn.textContent = label;
-    
-    var isActive = i === state.domainIndex;
-    if (btn.classList) {
-      if (isActive) btn.classList.add("is-active");
-      else btn.classList.remove("is-active");
-    } else {
-      var classes = (btn.className || "").split(" ");
-      var idx = classes.indexOf("is-active");
-      if (isActive && idx === -1) {
-        classes.push("is-active");
-      } else if (!isActive && idx !== -1) {
-        classes.splice(idx, 1);
-      }
-      btn.className = classes.join(" ");
-    }
+  var container = $("#serverOptions");
+  if (!container) return;
+  container.innerHTML = "";
+
+  for (var i = 0; i < state.domains.length; i++) {
+    var serverName = state.domains[i];
+    var active = i === state.domainIndex ? " is-active" : "";
+    var label = "Server " + (i + 1) + " · " + serverName;
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "server-option" + active;
+    button.setAttribute("data-server-index", String(i));
+    button.textContent = label;
+    button.onclick = (function(index) {
+      return function() {
+        state.domainIndex = index;
+        renderServerOptions();
+        if (state.selected) {
+          $("#playerFrame").src = embedUrl(state.selected);
+        }
+      };
+    })(i);
+    container.appendChild(button);
   }
-  
+
   var active = state.domains[state.domainIndex % state.domains.length] || "source";
   $("#serverName").textContent = "Server " + (state.domainIndex + 1) + " · " + active;
+  $("#serverHint").textContent = "If the stream is unavailable, switch to another server.";
 }
 
 function serializeItem(item) {

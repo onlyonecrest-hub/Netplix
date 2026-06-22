@@ -40,6 +40,20 @@
           </aside>
         </section>
         <p class="support-strip">Like and share our website to support us.</p>
+        <section class="provider-panel">
+          <div class="provider-header">
+            <div>
+              <h2 class="section-title">Providers</h2>
+              <p id="providerMessage" class="provider-message">Browse top movies from popular streaming services.</p>
+            </div>
+            <div class="provider-toggle">
+              <button type="button" class="provider-type is-active" data-type="movie">Movies</button>
+              <button type="button" class="provider-type" data-type="tv">TV Shows</button>
+            </div>
+          </div>
+          <div id="providerButtons" class="provider-grid"></div>
+          <div id="providerSection"></div>
+        </section>
         <section id="sections"></section>
       </section>
 
@@ -65,6 +79,7 @@
             <button class="server-option is-active" data-server="0">Full HD</button>
             <button class="server-option" data-server="1">Backup HD</button>
             <button class="server-option" data-server="2">Fast Stream</button>
+            <div class="server-hint" id="serverHint">If the stream is unavailable, switch to another server.</div>
           </aside>
         </section>
 

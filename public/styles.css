@@ -233,6 +233,75 @@ main {
   color: var(--muted);
 }
 
+.provider-panel {
+  margin-top: 1.6rem;
+  padding: 1.4rem 1.2rem;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(0, 168, 225, 0.08), rgba(7, 17, 25, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.provider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.provider-message {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.provider-toggle {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.provider-type {
+  min-width: 7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  padding: 0.75rem 0.95rem;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.provider-type.is-active {
+  background: var(--prime);
+  color: #00131d;
+}
+
+.provider-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-bottom: 1.2rem;
+}
+
+.provider-button {
+  padding: 0.95rem 1.05rem;
+  color: #fff;
+  min-width: 9rem;
+  border-radius: 14px;
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.16);
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 180ms ease;
+}
+
+.provider-button:hover,
+.provider-button:focus-visible,
+.provider-button.provider-active {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+.provider-section {
+  display: grid;
+  gap: 1rem;
+}
+
 .section-block {
   margin-top: 1.6rem;
 }
@@ -514,6 +583,17 @@ iframe {
   background: rgba(0, 168, 225, 0.15);
   color: #fff;
   font-weight: 700;
+}
+
+.server-panel.is-open {
+  box-shadow: 0 34px 112px rgba(0, 0, 0, 0.4);
+}
+
+.server-hint {
+  margin: 1rem 1rem 1.3rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .movie-detail {
