@@ -32,12 +32,12 @@ for (var i = 0; i < genreEndpoints.length; i++) {
 
 var providerList = [
   { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8 },
-  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 119 },
+  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10 },
   { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2 },
   { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337 },
   { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15 },
   { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350 },
-  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 384 }
+  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214 }
 ];
 
 var storageKey = "streamflix.device.v2";
