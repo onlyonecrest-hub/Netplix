@@ -31,14 +31,33 @@ for (var i = 0; i < genreEndpoints.length; i++) {
 }
 
 var providerList = [
-  { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8, logo: "https://image.tmdb.org/t/p/original/kRhm36EtAgqka33MGLnhrxG-IIy.png" },
-  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10, logo: "https://image.tmdb.org/t/p/original/6xQdxMwuR3R9XlSs4tYVYB31nM9.png" },
-  { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2, logo: "https://image.tmdb.org/t/p/original/rp3vMBqx2V5J4sRQUZZr3UqGcpV.png" },
-  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337, logo: "https://image.tmdb.org/t/p/original/Ggj4qXPg9HpGaBJPjWrSXLEvjlX.png" },
-  { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15, logo: "https://image.tmdb.org/t/p/original/8UlWHLMpgZm9bx6Y8QtW8xfFyVt.png" },
-  { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350, logo: "https://image.tmdb.org/t/p/original/gUJyeaYI8s3q4Xl1o1pj7duW14j.png" },
-  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214, logo: "https://image.tmdb.org/t/p/original/AtsgWhDnHTq68L0lLspdsiIqVXQ.png" }
+  { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8, logo: "https://cdn.simpleicons.org/netflix", logoFallback: "https://cdn.simpleicons.org/netflix" },
+  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10, logo: "https://cdn.simpleicons.org/primevideo", logoFallback: "https://cdn.simpleicons.org/primevideo|https://cdn.simpleicons.org/amazonprimevideo|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/amazonprimevideo.svg|https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonprimevideo.svg" },
+  { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2, logo: "https://cdn.simpleicons.org/apple", logoFallback: "https://cdn.simpleicons.org/apple" },
+  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337, logo: "https://cdn.simpleicons.org/disneyplus", logoFallback: "https://cdn.simpleicons.org/disneyplus|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/disneyplus.svg|https://cdn.simpleicons.org/disney" },
+  { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15, logo: "https://cdn.simpleicons.org/hulu", logoFallback: "https://cdn.simpleicons.org/hulu|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/hulu.svg" },
+  { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350, logo: "https://cdn.simpleicons.org/fubo", logoFallback: "https://cdn.simpleicons.org/fubo|https://cdn.simpleicons.org/fubotv|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/fubotv.svg" },
+  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214, logo: "https://cdn.simpleicons.org/hbomax", logoFallback: "https://cdn.simpleicons.org/hbomax" }
 ];
+
+// Try next fallback URL for provider logo images. The <img> elements use
+// `data-fallback` containing a pipe-separated list of candidate URLs.
+function tryNextLogo(img) {
+  try {
+    var list = img.getAttribute('data-fallback');
+    if (!list) { img.style.display = 'none'; return; }
+    var urls = list.split('|');
+    var idx = parseInt(img.getAttribute('data-fallback-idx') || '0', 10);
+    idx = isNaN(idx) ? 0 : idx;
+    // advance to next candidate
+    var next = idx + 1;
+    if (next >= urls.length) { img.style.display = 'none'; return; }
+    img.setAttribute('data-fallback-idx', next);
+    img.src = urls[next];
+  } catch (e) {
+    img.style.display = 'none';
+  }
+}
 
 var storageKey = "streamflix.device.v2";
 
@@ -572,7 +591,10 @@ function renderProviderPanel() {
   for (var i = 0; i < providerList.length; i++) {
     var provider = providerList[i];
     var activeClass = provider.id === state.selectedProvider ? " provider-active" : "";
-    var logoImg = '<img src="' + provider.logo + '" alt="' + escapeHtml(provider.title) + '" class="provider-logo" onerror="this.style.display=\'none\';" />';
+    var fallbackAttr = provider.logoFallback || provider.logo || '';
+    // escape pipe and quotes
+    var safeFallback = (fallbackAttr + '').replace(/"/g, '&quot;');
+    var logoImg = '<img src="' + provider.logo + '" alt="' + escapeHtml(provider.title) + '" class="provider-logo" data-fallback="' + safeFallback + '" data-fallback-idx="0" onerror="tryNextLogo(this)" />';
     buttonHtml.push('<button type="button" class="provider-button' + activeClass + '" data-provider="' + provider.id + '" title="' + escapeHtml(provider.title) + '">' + logoImg + '<span class="provider-title">' + escapeHtml(provider.title) + '</span></button>');
   }
 
