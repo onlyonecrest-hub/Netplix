@@ -97,9 +97,9 @@ function updateActiveNav(hash) {
 }
 
 function getRowConfig(key) {
-  var config = rowEndpointMap.get ? rowEndpointMap.get(key) : rowEndpointMap["_" + key];
+  var config = genreEndpointMap.get ? genreEndpointMap.get(key) : genreEndpointMap["_" + key];
   if (!config) {
-    config = genreEndpointMap.get ? genreEndpointMap.get(key) : genreEndpointMap["_" + key];
+    config = rowEndpointMap.get ? rowEndpointMap.get(key) : rowEndpointMap["_" + key];
   }
   return config;
 }
@@ -412,8 +412,21 @@ function getFirstItem() {
   if (row && row.items && row.items.length) {
     return row.items[0];
   }
-  var cached = state.itemCache.values ? state.itemCache.values() : [];
-  if (cached.length) return cached[0];
+  var cachedItems = [];
+  if (state.itemCache.values) {
+    var cached = state.itemCache.values();
+    if (Array.isArray(cached)) {
+      cachedItems = cached;
+    } else if (cached && typeof cached[Symbol.iterator] === 'function') {
+      var iterator = cached[Symbol.iterator]();
+      var result = iterator.next();
+      while (!result.done) {
+        cachedItems.push(result.value);
+        result = iterator.next();
+      }
+    }
+  }
+  if (cachedItems.length) return cachedItems[0];
   return null;
 }
 
@@ -830,10 +843,23 @@ function renderSuggestions(type, id) {
       }
       
       if (items.length === 0) {
-        var cached = state.itemCache.values ? state.itemCache.values() : [];
-        for (var k = 0; k < cached.length && items.length < 12; k++) {
-          if (!(cached[k].mediaType === type && String(cached[k].id) === String(id))) {
-            items.push(cached[k]);
+        var cachedItems = [];
+        if (state.itemCache.values) {
+          var cached = state.itemCache.values();
+          if (Array.isArray(cached)) {
+            cachedItems = cached;
+          } else if (cached && typeof cached[Symbol.iterator] === 'function') {
+            var iterator = cached[Symbol.iterator]();
+            var result = iterator.next();
+            while (!result.done) {
+              cachedItems.push(result.value);
+              result = iterator.next();
+            }
+          }
+        }
+        for (var k = 0; k < cachedItems.length && items.length < 12; k++) {
+          if (!(cachedItems[k].mediaType === type && String(cachedItems[k].id) === String(id))) {
+            items.push(cachedItems[k]);
           }
         }
       }
