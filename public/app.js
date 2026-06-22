@@ -31,13 +31,13 @@ for (var i = 0; i < genreEndpoints.length; i++) {
 }
 
 var providerList = [
-  { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8 },
-  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10 },
-  { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2 },
-  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337 },
-  { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15 },
-  { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350 },
-  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214 }
+  { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8, logo: "https://image.tmdb.org/t/p/original/kRhm36EtAgqka33MGLnhrxG-IIy.png" },
+  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10, logo: "https://image.tmdb.org/t/p/original/6xQdxMwuR3R9XlSs4tYVYB31nM9.png" },
+  { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2, logo: "https://image.tmdb.org/t/p/original/rp3vMBqx2V5J4sRQUZZr3UqGcpV.png" },
+  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337, logo: "https://image.tmdb.org/t/p/original/Ggj4qXPg9HpGaBJPjWrSXLEvjlX.png" },
+  { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15, logo: "https://image.tmdb.org/t/p/original/8UlWHLMpgZm9bx6Y8QtW8xfFyVt.png" },
+  { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350, logo: "https://image.tmdb.org/t/p/original/gUJyeaYI8s3q4Xl1o1pj7duW14j.png" },
+  { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214, logo: "https://image.tmdb.org/t/p/original/AtsgWhDnHTq68L0lLspdsiIqVXQ.png" }
 ];
 
 var storageKey = "streamflix.device.v2";
@@ -572,7 +572,8 @@ function renderProviderPanel() {
   for (var i = 0; i < providerList.length; i++) {
     var provider = providerList[i];
     var activeClass = provider.id === state.selectedProvider ? " provider-active" : "";
-    buttonHtml.push('<button type="button" class="provider-button' + activeClass + '" data-provider="' + provider.id + '" style="background:' + provider.color + ';">' + escapeHtml(provider.title) + '</button>');
+    var logoImg = '<img src="' + provider.logo + '" alt="' + escapeHtml(provider.title) + '" class="provider-logo" onerror="this.style.display=\'none\';" />';
+    buttonHtml.push('<button type="button" class="provider-button' + activeClass + '" data-provider="' + provider.id + '" title="' + escapeHtml(provider.title) + '">' + logoImg + '<span class="provider-title">' + escapeHtml(provider.title) + '</span></button>');
   }
 
   var section = $('#providerSection');
