@@ -11,8 +11,5 @@
   },
   "engines": {
     "node": ">=20"
-  },
-  "dependencies": {
-    "@cliqz/adblocker": "^1.34.0"
   }
 }
