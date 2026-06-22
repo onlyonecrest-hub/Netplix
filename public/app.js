@@ -32,9 +32,9 @@ for (var i = 0; i < genreEndpoints.length; i++) {
 
 var providerList = [
   { id: "netflix", title: "Netflix", color: "#e50914", tmdbId: 8, logo: "https://cdn.simpleicons.org/netflix", logoFallback: "https://cdn.simpleicons.org/netflix" },
-  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10, logo: "https://cdn.simpleicons.org/primevideo", logoFallback: "https://cdn.simpleicons.org/primevideo|https://cdn.simpleicons.org/amazonprimevideo|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/amazonprimevideo.svg|https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonprimevideo.svg" },
+  { id: "prime", title: "Prime Video", color: "#00a8e1", tmdbId: 10, logo: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/primevideo.svg", logoFallback: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/primevideo.svg|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/primevideo.svg|https://cdn.simpleicons.org/primevideo" },
   { id: "apple", title: "Apple TV", color: "#999", tmdbId: 2, logo: "https://cdn.simpleicons.org/apple", logoFallback: "https://cdn.simpleicons.org/apple" },
-  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337, logo: "https://cdn.simpleicons.org/disneyplus", logoFallback: "https://cdn.simpleicons.org/disneyplus|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/disneyplus.svg|https://cdn.simpleicons.org/disney" },
+  { id: "disney", title: "Disney+", color: "#0063e5", tmdbId: 337, logo: "/icons/disneyplus.svg", logoFallback: "/icons/disneyplus.svg|https://cdn.simpleicons.org/disneyplus|https://cdn.simpleicons.org/disney" },
   { id: "hulu", title: "Hulu", color: "#1ce783", tmdbId: 15, logo: "https://cdn.simpleicons.org/hulu", logoFallback: "https://cdn.simpleicons.org/hulu|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/hulu.svg" },
   { id: "fubo", title: "fuboTV", color: "#ef3f3f", tmdbId: 350, logo: "https://cdn.simpleicons.org/fubo", logoFallback: "https://cdn.simpleicons.org/fubo|https://cdn.simpleicons.org/fubotv|https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/fubotv.svg" },
   { id: "hbo", title: "HBO Max", color: "#5b47ff", tmdbId: 214, logo: "https://cdn.simpleicons.org/hbomax", logoFallback: "https://cdn.simpleicons.org/hbomax" }
